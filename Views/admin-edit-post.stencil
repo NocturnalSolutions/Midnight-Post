@@ -1,0 +1,10 @@
+{% extends "layout.stencil" %}
+
+{% block pageBody %}
+<form method="post" href="/admin/new" enctype="multipart/form-data">
+  <input type="text" name="subject" value="{{ post.subject }}" />
+  <textarea name="body">{{ post.body }}</textarea>
+  <input type="hidden" name="id" value="{{ post.id }}" />
+  <input type="submit" />
+</form>
+{% endblock %}

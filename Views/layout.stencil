@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>{% block pageTitle %}Midnight Post{% endblock %}</title>
+  </head>
+  <body>
+    <header>
+      <h1><a href="/">Midnight Post</a></h1>
+    </header>
+    {% block pageBody %}{% endblock %}
+  </body>
+</html>

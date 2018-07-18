@@ -1,0 +1,6 @@
+{% extends "layout.stencil" %}
+
+{% block pageBody %}
+<h2>{{ post.latestRevision.subject }}</h2>
+{{ post.latestRevision.body }}
+{% endblock %}
