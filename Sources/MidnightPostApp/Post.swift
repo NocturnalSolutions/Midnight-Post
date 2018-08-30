@@ -66,25 +66,31 @@ struct Post {
     init(loadId: UInt) throws {
         let pt = PostTable()
         let rt = PostRevisionTable()
-        let s = Select(from: pt)
+        var cols = rt.columns
+        cols.append(pt.id)
+        cols.append(pt.date)
+        let s = Select(fields: cols, from: [pt])
+            .where(pt.id == Int(loadId))
             .join(rt).on(pt.id == rt.postId)
             .order(by: .DESC(rt.date))
             .limit(to: 1)
-        var values: [String: Any?]?
+        var possibleRow: [String: Any?]?
         MidnightPost.dbCxn?.execute(query: s) { queryResult in
-            if let result = queryResult.asRows?.first {
-                values = result
+            if let rows = queryResult.asRows, let row = rows.first {
+                possibleRow = row
             }
         }
-        if let values = values {
-            guard let id = values[pt.id.name] as? UInt,
-                let dateStr = values[pt.date.name] as? String,
+        if let row = possibleRow {
+            // I don't understand why all the values are double-wrapped
+            let goodRow = row.mapValues { value in value! }
+            guard let id = goodRow[pt.id.name] as? Int32,
+                let dateStr = goodRow[pt.date.name] as? String,
                 let date = MidnightPost.dateFormatter.date(from: dateStr) else {
                 throw PostError.FaultCreatingFromRow
             }
-            self.id = id
+            self.id = UInt(id)
             self.date = date
-            latestRevision = try PostRevision(fromDbRow: values)
+            latestRevision = try PostRevision(fromDbRow: goodRow)
         }
         else {
             throw PostError.IdNotFound

@@ -15,13 +15,21 @@ public class MidnightPost {
         return formatter
     }()
 
+    public enum MidnightPostError: Error{
+        case databaseInstallationError
+    }
+
     public init() {
         connectDb()
     }
 
-    public func connectDb() {
+    public init(testMode: Bool = false) {
+        connectDb(testMode: testMode)
+    }
+
+    public func connectDb(testMode: Bool = false) {
         // Can't cast directly to NSString on Linux, apparently
-        let dbPath = "~/Databases/midnight-post.sqlite"
+        let dbPath = testMode ? FileManager.default.temporaryDirectory.absoluteString + UUID().uuidString + ".sqlite" : "~/Databases/midnight-post.sqlite"
         let nsDbPath = NSString(string: dbPath)
         // Redundant type label below is required to avoid a segfault on compilation for
         // some effing reason.
@@ -35,6 +43,40 @@ public class MidnightPost {
         }
     }
 
+    public func installDb() throws {
+        let pt = PostTable()
+        let rt = PostRevisionTable()
+
+        _ = rt.foreignKey(rt.postId, references: pt.id)
+        _ = rt.primaryKey(rt.postId, rt.id)
+
+        var errorOccurred = false
+        pt.create(connection: MidnightPost.dbCxn!) { result in
+            guard result.success else {
+                errorOccurred = true
+//                throw MidnightPostError.tableCreationFailed
+//                let buildSql = try! pt.description(connection: MidnightPost.dbCxn!)
+//                try? response.send(status: .internalServerError)
+//                    .send("Cannot create post table: \(result.asError.debugDescription)\n\(buildSql)")
+//                    .end()
+                return
+            }
+            rt.create(connection: MidnightPost.dbCxn!) { result in
+                guard result.success else {
+                    errorOccurred = true
+//                    let buildSql = try! rt.description(connection: MidnightPost.dbCxn!)
+//                    try? response.send(status: .internalServerError)
+//                        .send("Cannot create post revision table: \(result.asError.debugDescription)\n\(buildSql)")
+//                        .end()
+                    return
+                }
+            }
+        }
+        if errorOccurred {
+            throw MidnightPostError.databaseInstallationError
+        }
+    }
+
     public func generateRouter() -> Router {
         let r = Router()
         r.setDefault(templateEngine: StencilTemplateEngine())
@@ -42,31 +84,13 @@ public class MidnightPost {
         r.post(middleware: BodyParserMultiValue())
 
         r.get("/install") { request, response, next in
-            let pt = PostTable()
-            let rt = PostRevisionTable()
-
-            _ = rt.foreignKey(rt.postId, references: pt.id)
-            _ = rt.primaryKey(rt.postId, rt.id)
-
-            pt.create(connection: MidnightPost.dbCxn!) { result in
-                guard result.success else {
-                    let buildSql = try! pt.description(connection: MidnightPost.dbCxn!)
-                    try? response.send(status: .internalServerError)
-                        .send("Cannot create post table: \(result.asError.debugDescription)\n\(buildSql)")
-                        .end()
-                    return
-                }
-                rt.create(connection: MidnightPost.dbCxn!) { result in
-                    guard result.success else {
-                        let buildSql = try! rt.description(connection: MidnightPost.dbCxn!)
-                        try? response.send(status: .internalServerError)
-                            .send("Cannot create post revision table: \(result.asError.debugDescription)\n\(buildSql)")
-                            .end()
-                        return
-                    }
-                }
+            do {
+                try self.installDb()
+                response.send("Apparent success")
             }
-            response.send("Apparent success")
+            catch {
+                response.send(status: .internalServerError).send("Error occurred.")
+            }
         }
 
         // MARK: New post creation page
@@ -111,7 +135,7 @@ public class MidnightPost {
         }
 
         // MARK: Show a post
-        r.get("/post/:post(d+)") { request, response, next in
+        r.get("/post/:post(\\d+)") { request, response, next in
             guard let postIdStr = request.parameters["post"], let postId = UInt(postIdStr) else {
                 try response.send(status: .notFound).end()
                 next()

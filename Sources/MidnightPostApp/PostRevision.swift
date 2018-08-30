@@ -50,16 +50,18 @@ struct PostRevision {
 
     init(fromDbRow dbRow: [String: Any?]) throws {
         let pr = PostRevisionTable()
-        guard let id = dbRow[pr.id.name] as? UInt,
-            let postId = dbRow[pr.postId.name] as? UInt,
-            let subject = dbRow[pr.subject.name] as? String,
-            let body = dbRow[pr.body.name] as? String,
-            let dateStr = dbRow[pr.date.name] as? String,
+        // WTMF, why are they double-wrapped again?
+        let fixedRow = dbRow.mapValues { value in value! }
+        guard let id = fixedRow[pr.id.name] as? Int32,
+            let postId = fixedRow[pr.postId.name] as? Int32,
+            let subject = fixedRow[pr.subject.name] as? String,
+            let body = fixedRow[pr.body.name] as? String,
+            let dateStr = fixedRow[pr.date.name] as? String,
             let date = MidnightPost.dateFormatter.date(from: dateStr) else {
             throw PostRevisionError.FaultCreatingFromRow
         }
-        self.id = id
-        self.post = postId
+        self.id = UInt(id)
+        self.post = UInt(postId)
         self.subject = subject
         self.body = body
         self.date = date
