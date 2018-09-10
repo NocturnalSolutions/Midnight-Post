@@ -3,6 +3,8 @@ import KituraStencil
 import SwiftKuery
 import SwiftKuerySQLite
 import Foundation
+import Configuration_INIDeserializer
+import Configuration
 
 public class MidnightPost {
 
@@ -15,21 +17,47 @@ public class MidnightPost {
         return formatter
     }()
 
+    public let config: ConfigurationManager
+
     public enum MidnightPostError: Error{
         case databaseInstallationError
     }
 
     public init() {
+        config = ConfigurationManager()
+        config.use(INIDeserializer())
+
+        config.load([
+            // Config file location
+            "config": "~/.midnight-post.conf",
+            // Database file path
+            "database-path": "~/Databases/midnight-post.sqlite",
+            // Test database path
+            "test-database-path": "~/Databases/midnight-post-test.sqlite",
+            ])
+
+        // Load CLI arguments first because an overriding config file path may have been
+        // specified
+        config.load(.commandLineArguments)
+        if let configFileLoc = config["config"] as? String {
+            config.load(file: configFileLoc)
+            // Load CLI arguments again because we want those to override settings in the
+            // config file
+            config.load(.commandLineArguments)
+        }
+    }
+
+    public func start() {
         connectDb()
     }
 
-    public init(testMode: Bool = false) {
-        connectDb(testMode: testMode)
-    }
-
-    public func connectDb(testMode: Bool = false) {
+    public func connectDb() {
+        let testMode = config["test-mode"] as? Bool ?? false
         // Can't cast directly to NSString on Linux, apparently
-        let dbPath = testMode ? FileManager.default.temporaryDirectory.absoluteString + UUID().uuidString + ".sqlite" : "~/Databases/midnight-post.sqlite"
+        guard let dbPath = testMode ? config["test-database-path"] as? String : config["database-path"] as? String else {
+            print("Cannot determine database path")
+            exit(1)
+        }
         let nsDbPath = NSString(string: dbPath)
         // Redundant type label below is required to avoid a segfault on compilation for
         // some effing reason.

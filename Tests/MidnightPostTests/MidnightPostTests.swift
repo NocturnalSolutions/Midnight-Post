@@ -15,7 +15,9 @@ class PostTest: MidnightTestCase {
     }
 
     public override func setUp() {
-        let mp = MidnightPost(testMode: true)
+        let mp = MidnightPost()
+        mp.config["test-mode"] = true as Any
+        mp.start()
         try? mp.installDb()
         router = mp.generateRouter()
         requestOptions = ClientRequest.parse("http://localhost:8080/")
