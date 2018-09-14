@@ -5,6 +5,7 @@ import SwiftKuerySQLite
 import Foundation
 import Configuration_INIDeserializer
 import Configuration
+import KituraMarkdown
 
 public class MidnightPost {
 
@@ -171,7 +172,7 @@ public class MidnightPost {
             }
             do {
                 let post = try Post(loadId: postId)
-                try response.render("view-post", context: ["post": post])
+                try response.render("view-post", context: post.prepareForView())
             }
             catch {
                 try response.send(status: .internalServerError).end()

@@ -13,7 +13,8 @@ let package = Package(
         .package(url: "https://github.com/NocturnalSolutions/Swift-Kuery-SQLite.git", .branch("alterable-pk")),
         .package(url: "https://github.com/IBM-Swift/Kitura-StencilTemplateEngine.git", from: "1.9.1"),
         .package(url: "https://github.com/NocturnalSolutions/Configuration-INIDeserializer.git", .branch("master")),
-        .package(url: "https://github.com/NocturnalSolutions/MidnightTest.git", .branch("master"))
+        .package(url: "https://github.com/NocturnalSolutions/MidnightTest.git", .branch("master")),
+        .package(url: "https://github.com/NocturnalSolutions/Kitura-Markdown.git", from: "1.1.0")
         ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -24,7 +25,12 @@ let package = Package(
         ),
         .target(
             name: "MidnightPostApp",
-            dependencies: ["Kitura", "SwiftKuerySQLite", "KituraStencil", "Configuration-INIDeserializer"]
+            dependencies: [
+                "Kitura",
+                "SwiftKuerySQLite",
+                "KituraStencil",
+                "Configuration-INIDeserializer",
+                "KituraMarkdown"]
         ),
         .testTarget(
             name: "MidnightPostTests",

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftKuery
+import KituraMarkdown
 
 class PostTable_v0: Table {
     let tableName = "posts"
@@ -95,5 +96,18 @@ struct Post {
         else {
             throw PostError.IdNotFound
         }
+    }
+
+    /// Prepare properties for viewing via Stencil
+    func prepareForView() -> [String: Any] {
+        return [
+            "subject": latestRevision.subject.webSanitize(),
+            "body": KituraMarkdown.render(from: latestRevision.body.webSanitize()),
+            "creationDate": MidnightPost.dateFormatter.string(from: date).webSanitize(),
+            "editDate": MidnightPost.dateFormatter.string(from: latestRevision.date).webSanitize(),
+            "id": String(id),
+            "revisionId": String(latestRevision.id)
+        ] as [String: Any]
+
     }
 }
