@@ -182,6 +182,17 @@ public class MidnightPost {
             next()
         }
 
+        // MARK: Front page
+        r.get("/") { request, response, next in
+            let posts = Post.getNewPosts()
+            guard let postCount = try? Post.getPostCount() else {
+                response.send(status: .internalServerError).send("Error occurred.")
+                return
+            }
+            let formattedPosts = posts.map { $0.prepareForView() }
+            try response.render("front", context: ["posts": formattedPosts, "postCount": postCount.posts, "pageCount": postCount.pages])
+        }
+
         return r
     }
 }

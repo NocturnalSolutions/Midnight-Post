@@ -1,0 +1,11 @@
+{% extends "layout.stencil" %}
+
+{% block pageBody %}
+{% for post in posts %}
+<article id="post-{{ post.id }}">
+<h2>{{ post.subject }}</h2>
+<h3><time>{{ post.creationDate }}</time></h3>
+{{ post.body }}
+</article>
+{% endfor %}
+{% endblock %}

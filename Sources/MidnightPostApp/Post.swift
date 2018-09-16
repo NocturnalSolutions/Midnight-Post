@@ -16,12 +16,15 @@ struct Post {
     let date: Date
     let latestRevision: PostRevision
 
+    static let postsPerPage: Int = 10
+
     enum PostError: Error {
         case FaultOnInitialInsert(queryError: Error)
         case FaultOnInitialRevision(queryError: Error)
         case IdNotFound
         case FaultCreatingFromRow
         case FaultFetchingInsertId
+        case FaultGettingCount
     }
 
     init(subject: String, body: String) throws {
@@ -84,22 +87,27 @@ struct Post {
         if let row = possibleRow {
             // I don't understand why all the values are double-wrapped
             let goodRow = row.mapValues { value in value! }
-            guard let id = goodRow[pt.id.name] as? Int32,
-                let dateStr = goodRow[pt.date.name] as? String,
-                let date = MidnightPost.dateFormatter.date(from: dateStr) else {
-                throw PostError.FaultCreatingFromRow
-            }
-            self.id = UInt(id)
-            self.date = date
-            latestRevision = try PostRevision(fromDbRow: goodRow)
+            try self.init(fromDbRow: goodRow)
         }
         else {
             throw PostError.IdNotFound
         }
     }
 
+    init(fromDbRow: [String: Any]) throws {
+        let pt = PostTable()
+        guard let id = fromDbRow[pt.id.name] as? Int32,
+            let dateStr = fromDbRow[pt.date.name] as? String,
+            let date = MidnightPost.dateFormatter.date(from: dateStr) else {
+                throw PostError.FaultCreatingFromRow
+        }
+        self.id = UInt(id)
+        self.date = date
+        latestRevision = try PostRevision(fromDbRow: fromDbRow)
+    }
+
     /// Prepare properties for viewing via Stencil
-    func prepareForView() -> [String: Any] {
+    func prepareForView() -> [String: Any?] {
         return [
             "subject": latestRevision.subject.webSanitize(),
             "body": KituraMarkdown.render(from: latestRevision.body.webSanitize()),
@@ -108,6 +116,50 @@ struct Post {
             "id": String(id),
             "revisionId": String(latestRevision.id)
         ] as [String: Any]
+    }
 
+    /// Get most recent posts
+    static func getNewPosts(offset: UInt = 0) -> [Post] {
+        let pt = PostTable()
+        let rt = PostRevisionTable()
+        var cols = rt.columns
+        cols.append(pt.id)
+        cols.append(pt.date)
+
+        let s = Select(fields: cols, from: [pt])
+            .join(rt).on(pt.id == rt.postId)
+            .order(by: .DESC(pt.date))
+            .limit(to: Post.postsPerPage)
+            .offset(Post.postsPerPage * Int(offset))
+        var posts: [Post]? = nil
+        MidnightPost.dbCxn?.execute(query: s) { queryResult in
+            if let rows = queryResult.asRows {
+                posts = try? rows.map { try Post.init(fromDbRow: $0 as! [String: Any]) }
+            }
+        }
+        return posts ?? [Post]()
+    }
+
+    /// Get count of all posts
+    static func getPostCount() throws -> (posts: UInt, pages: UInt) {
+        let pt = PostTable()
+        let s = Select(count(pt.id).as("count"), from: pt)
+        var postCount: Int? = nil
+        MidnightPost.dbCxn?.execute(query: s) { queryResult in
+            if let rows = queryResult.asRows, let value = rows.first?.first?.value as? Int32 {
+                postCount = Int(value)
+            }
+        }
+        if let postCount = postCount {
+            if postCount == 0 {
+                return (posts: 0, pages: 0)
+            }
+            else {
+                return (posts: UInt(postCount), pages: UInt(ceil(Double(postCount) / Double(Post.postsPerPage))))
+            }
+        }
+        else {
+            throw PostError.FaultGettingCount
+        }
     }
 }
