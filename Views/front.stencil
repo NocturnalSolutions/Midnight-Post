@@ -3,9 +3,20 @@
 {% block pageBody %}
 {% for post in posts %}
 <article id="post-{{ post.id }}">
-<h2>{{ post.subject }}</h2>
+<h2><a href="/post/{{ post.id }}">{{ post.subject }}</a></h2>
 <h3><time>{{ post.creationDate }}</time></h3>
 {{ post.body }}
 </article>
 {% endfor %}
+
+<nav>
+  {% if curPage > 0 %}
+  <a href="/{% if curPage > 1 %}front/{{ curPage|dec }}{% endif %}" class="pager-back">&larr; Later Posts</a>
+  {% endif %}
+  {% if curPage < pageCount %}
+  <a href="/front/{{ curPage|inc }}" class="pager-forward">&rarr; Earlier Posts</a>
+  {% endif %}
+</nav>
 {% endblock %}
+
+

@@ -1,5 +1,6 @@
 import Kitura
 import KituraStencil
+import Stencil
 import SwiftKuery
 import SwiftKuerySQLite
 import Foundation
@@ -106,9 +107,43 @@ public class MidnightPost {
         }
     }
 
+    func getFrontPagePosts(response: RouterResponse, page: UInt = 0) throws {
+        guard let postCount = try? Post.getPostCount() else {
+            response.send(status: .internalServerError).send("Error occurred.")
+            return
+        }
+        guard page <= postCount.pages else {
+            try response.send(status: .notFound).end()
+            return
+        }
+        let posts = Post.getNewPosts()
+        let formattedPosts = posts.map { $0.prepareForView() }
+        try response.render("front", context: [
+            "posts": formattedPosts,
+            "postCount": postCount.posts,
+            "pageCount": postCount.pages,
+            "curPage": page
+            ])
+    }
+
     public func generateRouter() -> Router {
         let r = Router()
-        r.setDefault(templateEngine: StencilTemplateEngine())
+
+        // Add some custom filters to Stencil
+        let ext = Extension()
+        ext.registerFilter("inc") { value in
+            guard let int = value as? UInt else {
+                return ""
+            }
+            return String(int + 1)
+        }
+        ext.registerFilter("dec") { value in
+            guard let int = value as? UInt else {
+                return ""
+            }
+            return String(int - 1)
+        }
+        r.setDefault(templateEngine: StencilTemplateEngine(extension: ext))
 
         r.post(middleware: BodyParserMultiValue())
 
@@ -182,15 +217,26 @@ public class MidnightPost {
             next()
         }
 
-        // MARK: Front page
-        r.get("/") { request, response, next in
-            let posts = Post.getNewPosts()
-            guard let postCount = try? Post.getPostCount() else {
-                response.send(status: .internalServerError).send("Error occurred.")
+        // MARK: Page back from front page
+        r.get("/front/:page(\\d+)") { request, response, next in
+            guard let page = request.parameters["page"], let pageInt = UInt(page) else {
+                try response.send(status: .notFound).end()
+                next()
                 return
             }
-            let formattedPosts = posts.map { $0.prepareForView() }
-            try response.render("front", context: ["posts": formattedPosts, "postCount": postCount.posts, "pageCount": postCount.pages])
+            if pageInt == 0 {
+                try response.redirect("/").end()
+            }
+            else {
+                try self.getFrontPagePosts(response: response, page: pageInt)
+            }
+            next()
+        }
+
+        // MARK: Front page
+        r.get("/") { request, response, next in
+            try self.getFrontPagePosts(response: response)
+            next()
         }
 
         return r

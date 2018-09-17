@@ -107,7 +107,7 @@ struct Post {
     }
 
     /// Prepare properties for viewing via Stencil
-    func prepareForView() -> [String: Any?] {
+    func prepareForView() -> [String: Any] {
         return [
             "subject": latestRevision.subject.webSanitize(),
             "body": KituraMarkdown.render(from: latestRevision.body.webSanitize()),
@@ -119,7 +119,7 @@ struct Post {
     }
 
     /// Get most recent posts
-    static func getNewPosts(offset: UInt = 0) -> [Post] {
+    static func getNewPosts(page: UInt = 0) -> [Post] {
         let pt = PostTable()
         let rt = PostRevisionTable()
         var cols = rt.columns
@@ -130,11 +130,13 @@ struct Post {
             .join(rt).on(pt.id == rt.postId)
             .order(by: .DESC(pt.date))
             .limit(to: Post.postsPerPage)
-            .offset(Post.postsPerPage * Int(offset))
+            .offset(Post.postsPerPage * Int(page))
         var posts: [Post]? = nil
         MidnightPost.dbCxn?.execute(query: s) { queryResult in
             if let rows = queryResult.asRows {
-                posts = try? rows.map { try Post.init(fromDbRow: $0 as! [String: Any]) }
+                posts = try? rows.map { row in
+                    try Post.init(fromDbRow: row)
+                }
             }
         }
         return posts ?? [Post]()
