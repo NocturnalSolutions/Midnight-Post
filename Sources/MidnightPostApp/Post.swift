@@ -11,12 +11,12 @@ class PostTable_v0: Table {
 
 typealias PostTable = PostTable_v0
 
-struct Post {
+public struct Post {
     let id: UInt
     let date: Date
     let latestRevision: PostRevision
 
-    static let postsPerPage: Int = 10
+    public static let postsPerPage: Int = 10
 
     enum PostError: Error {
         case FaultOnInitialInsert(queryError: Error)

@@ -31,6 +31,23 @@ class PostTest: MidnightTestCase {
         requestOptions.append(.maxRedirects(0))
         try? testPostResponse("/admin/new", fields: postFields, enctype: .Multipart, checker: checkStatus(.seeOther))
     }
+
+    func testFrontPage() {
+        let postFields = ["body": ["baz"], "subject": ["qux"]]
+        try? testPostResponse("/admin/new", fields: postFields, enctype: .Multipart)
+        // Check new post appears on front page
+        testResponse("/", checker: checkString("baz"), checkString("qux"))
+
+        let newPostFields = ["body": ["foo"], "subject": ["bar"]]
+        for _ in 0...Post.postsPerPage {
+            try? testPostResponse("/admin/new", fields: newPostFields, enctype: .Multipart)
+        }
+
+        // Check we now have a link to the next page
+        testResponse("/", checker: checkString("/front/1"))
+        // Check that the first post is now on the "second" page
+        testResponse("/front/1", checker: checkString("baz"))
+    }
 }
 
 
