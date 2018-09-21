@@ -19,6 +19,26 @@ public class MidnightPost {
         return formatter
     }()
 
+    lazy var dbLocation: Location = {
+        let testMode = config["test-mode"] as? Bool ?? false
+        // Can't cast directly to NSString on Linux, apparently
+        guard let dbPath = testMode ? config["test-database-path"] as? String : config["database-path"] as? String else {
+            print("Cannot determine database path")
+            exit(1)
+        }
+        if dbPath == "" {
+            print("WARNING! Using volatile in-memory database. Data loss is inevitable. If this is not intended, you probably need to set the \"database-path\" configuration value.")
+            return .inMemory
+        }
+        else {
+            let nsDbPath = NSString(string: dbPath)
+            // Redundant type label below is required to avoid a segfault on compilation for
+            // some effing reason.
+            let expandedDbPath: String = String(nsDbPath.expandingTildeInPath)
+            return .uri(expandedDbPath)
+        }
+    }()
+
     public let config: ConfigurationManager
 
     public enum MidnightPostError: Error{
@@ -34,7 +54,7 @@ public class MidnightPost {
             "config": "~/.midnight-post.conf",
             // Database file path
             "database-path": "~/Databases/midnight-post.sqlite",
-            // Test database path
+            // Test database path. An empty string means use an in-memory DB.
             "test-database-path": "~/Databases/midnight-post-test.sqlite",
             ])
 
@@ -54,17 +74,7 @@ public class MidnightPost {
     }
 
     public func connectDb() {
-        let testMode = config["test-mode"] as? Bool ?? false
-        // Can't cast directly to NSString on Linux, apparently
-        guard let dbPath = testMode ? config["test-database-path"] as? String : config["database-path"] as? String else {
-            print("Cannot determine database path")
-            exit(1)
-        }
-        let nsDbPath = NSString(string: dbPath)
-        // Redundant type label below is required to avoid a segfault on compilation for
-        // some effing reason.
-        let expandedDbPath: String = String(nsDbPath.expandingTildeInPath)
-        MidnightPost.dbCxn = SQLiteConnection(filename: expandedDbPath)
+        MidnightPost.dbCxn = SQLiteConnection(dbLocation)
         MidnightPost.dbCxn?.connect() { error in
             if let error = error {
                 print("Failure opening database: \(error.description)")
@@ -104,6 +114,20 @@ public class MidnightPost {
         }
         if errorOccurred {
             throw MidnightPostError.databaseInstallationError
+        }
+    }
+
+    /// Destroy the database file. For resetting the DB when running tests.
+    public func destroyDb() throws {
+        if MidnightPost.dbCxn?.isConnected == true {
+            MidnightPost.dbCxn?.closeConnection()
+        }
+        switch dbLocation {
+        case .uri(let path):
+            try FileManager().removeItem(atPath: path)
+        default: break
+        // If the database was .inMemory, it was destroyed when we closed the
+        // connection.
         }
     }
 

@@ -2,9 +2,9 @@ import Foundation
 import Kitura
 import KituraNet
 import XCTest
-import MidnightPostApp
 import Kitura
 import MidnightTest
+@testable import MidnightPostApp
 
 class PostTest: MidnightTestCase {
 
@@ -14,14 +14,25 @@ class PostTest: MidnightTestCase {
         ]
     }
 
+    let mp = MidnightPost()
+
     public override func setUp() {
-        let mp = MidnightPost()
         mp.config["test-mode"] = true as Any
         mp.start()
         try? mp.installDb()
         router = mp.generateRouter()
         requestOptions = ClientRequest.parse("http://localhost:8080/")
         super.setUp()
+    }
+
+    public override func tearDown() {
+        do {
+            try mp.destroyDb()
+        }
+        catch {
+            fatalError("Could not destroy database after testing.")
+        }
+        super.tearDown()
     }
 
     func testNewPost() {
