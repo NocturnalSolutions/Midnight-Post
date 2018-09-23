@@ -1,7 +1,8 @@
 {% extends "layout.stencil" %}
 
 {% block pageBody %}
-<article id="post-{{ post.id }}">
+<nav><a href="/post/{{ id }}/edit">Edit</a></nav>
+<article id="post-{{ id }}">
 <h2>{{ subject }}</h2>
 <h3>{{ creationDate }}</h3>
 </article>

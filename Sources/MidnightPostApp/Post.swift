@@ -20,7 +20,7 @@ public struct Post {
 
     enum PostError: Error {
         case FaultOnInitialInsert(queryError: Error)
-        case FaultOnInitialRevision(queryError: Error)
+        case FaultOnRevision(queryError: Error)
         case IdNotFound
         case FaultCreatingFromRow
         case FaultFetchingInsertId
@@ -63,7 +63,7 @@ public struct Post {
             latestRevision = try PostRevision(forNewPost: id, subject: subject, body: body, date: date)
         }
         catch {
-            throw PostError.FaultOnInitialRevision(queryError: error)
+            throw PostError.FaultOnRevision(queryError: error)
         }
     }
 
@@ -73,10 +73,10 @@ public struct Post {
         var cols = rt.columns
         cols.append(pt.id)
         cols.append(pt.date)
-        let s = Select(fields: cols, from: [pt])
-            .where(pt.id == Int(loadId))
-            .join(rt).on(pt.id == rt.postId)
-            .order(by: .DESC(rt.date))
+        let s = Select(fields: cols, from: [rt])
+            .where(rt.postId == Int(loadId))
+            .join(pt).on(pt.id == rt.postId)
+            .order(by: .DESC(rt.id))
             .limit(to: 1)
         var possibleRow: [String: Any?]?
         MidnightPost.dbCxn?.execute(query: s) { queryResult in
@@ -104,6 +104,17 @@ public struct Post {
         self.id = UInt(id)
         self.date = date
         latestRevision = try PostRevision(fromDbRow: fromDbRow)
+    }
+
+    /// Add a new revision. Note we're not changing the actual latestRevision
+    /// property.
+    func addNewRevision(subject: String, body: String) throws {
+        do {
+            _ = try PostRevision(forPost: id, subject: subject, body: body, revisionId: latestRevision.id + 1)
+        }
+        catch {
+            throw PostError.FaultOnRevision(queryError: error)
+        }
     }
 
     /// Prepare properties for viewing via Stencil

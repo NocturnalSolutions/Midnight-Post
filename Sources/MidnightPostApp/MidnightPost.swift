@@ -153,6 +153,9 @@ public class MidnightPost {
     public func generateRouter() -> Router {
         let r = Router()
 
+        let postParser = PostParser()
+        let postLoader = PostLoader()
+
         // Add some custom filters to Stencil
         let ext = Extension()
         ext.registerFilter("inc") { value in
@@ -188,30 +191,15 @@ public class MidnightPost {
         }
 
         // MARK: New post submit handler
+        r.post("/admin/new", middleware: postParser)
         r.post("/admin/new") { request, response, next in
-            guard let postBody = request.body?.asMultiPart else {
-                try response.send(status: .unprocessableEntity).end()
-                next()
-                return
-            }
-            var postedSubject: String?
-            var postedBody: String?
-            for part in postBody {
-                if part.name == "body" {
-                    postedBody = part.body.asText
-                }
-                else if part.name == "subject" {
-                    postedSubject = part.body.asText
-                }
-            }
-
-            guard let bodyValue = postedBody, let subjValue = postedSubject else {
+            guard let postedPost = request.userInfo["postedPost"] as? [String: String] else {
                 try response.send(status: .unprocessableEntity).end()
                 next()
                 return
             }
             do {
-                let post = try Post(subject: subjValue, body: bodyValue)
+                let post = try Post(subject: postedPost["subject"]!, body: postedPost["body"]!)
                 try response.redirect("/post/\(post.id)", status: .seeOther)
             }
             catch  {
@@ -223,22 +211,43 @@ public class MidnightPost {
         }
 
         // MARK: Show a post
+        r.get("/post/:post(\\d+)", middleware: postLoader)
         r.get("/post/:post(\\d+)") { request, response, next in
-            guard let postIdStr = request.parameters["post"], let postId = UInt(postIdStr) else {
-                try response.send(status: .notFound).end()
+            guard let post = request.userInfo["loadedPost"] as? Post else {
                 next()
                 return
             }
+            try response.render("view-post", context: post.prepareForView())
+            next()
+        }
+
+        // MARK: Show form to edit a post
+        r.get("/post/:post(\\d+)/edit") { request, response, next in
+            guard let post = request.userInfo["loadedPost"] as? Post else {
+                next()
+                return
+            }
+            try response.render("admin-edit-post", context: ["post": post])
+            next()
+        }
+
+        // MARK: Take and save a post revision
+        r.post("/post/:post(\\d+)/edit", middleware: postLoader, postParser)
+        r.post("/post/:post(\\d+)/edit") { request, response, next in
+            guard let post = request.userInfo["loadedPost"] as? Post,
+                let postedPost = request.userInfo["postedPost"] as? [String: String] else {
+                    next()
+                    return
+            }
             do {
-                let post = try Post(loadId: postId)
-                try response.render("view-post", context: post.prepareForView())
+                try post.addNewRevision(subject: postedPost["subject"]!, body: postedPost["body"]!)
+                try response.redirect("/post/\(post.id)", status: .seeOther)
             }
             catch {
                 try response.send(status: .internalServerError).end()
-                next()
-                return
             }
             next()
+
         }
 
         // MARK: Page back from front page

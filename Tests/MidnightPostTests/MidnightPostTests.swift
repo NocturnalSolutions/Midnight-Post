@@ -11,6 +11,8 @@ class PostTest: MidnightTestCase {
     static var allTests: [(String, (PostTest) -> () throws -> Void)] {
         return [
             ("testNewPost", testNewPost),
+            ("testFrontPage", testFrontPage),
+            ("testPostEdit", testPostEdit),
         ]
     }
 
@@ -22,6 +24,7 @@ class PostTest: MidnightTestCase {
         try? mp.installDb()
         router = mp.generateRouter()
         requestOptions = ClientRequest.parse("http://localhost:8080/")
+        continueAfterFailure = false
         super.setUp()
     }
 
@@ -41,6 +44,7 @@ class PostTest: MidnightTestCase {
         try? testPostResponse("/admin/new", fields: postFields, enctype: .Multipart, checker: checkString("baz"))
         requestOptions.append(.maxRedirects(0))
         try? testPostResponse("/admin/new", fields: postFields, enctype: .Multipart, checker: checkStatus(.seeOther))
+        print("testNewPost")
     }
 
     func testFrontPage() {
@@ -58,6 +62,17 @@ class PostTest: MidnightTestCase {
         testResponse("/", checker: checkString("/front/1"))
         // Check that the first post is now on the "second" page
         testResponse("/front/1", checker: checkString("baz"))
+        print("testFrontPage")
+    }
+
+    func testPostEdit() {
+        let newPostFields = ["body": ["foo"], "subject": ["bar"]]
+        try? testPostResponse("/admin/new", fields: newPostFields, enctype: .Multipart, checker: checkString("Edit"), checkString("post/1/edit"))
+        let editFields = ["body": ["baz"], "subject": ["qux"]]
+        try? testPostResponse("/post/1/edit", fields: editFields, enctype: .Multipart, checker: checkString("qux"))
+        requestOptions.append(.maxRedirects(0))
+        try? testPostResponse("/post/1/edit", fields: editFields, enctype: .Multipart, checker: checkStatus(.seeOther))
+        print("testPostEdit")
     }
 }
 

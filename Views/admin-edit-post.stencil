@@ -1,9 +1,9 @@
 {% extends "layout.stencil" %}
 
 {% block pageBody %}
-<form method="post" href="/admin/new" enctype="multipart/form-data">
-  <input type="text" name="subject" value="{{ post.subject }}" />
-  <textarea name="body">{{ post.body }}</textarea>
+<form method="post" href="{% if post.id %}/post/{{ post.id }}/edit{% else %}/admin/new{% endif %}" enctype="multipart/form-data">
+  <input type="text" name="subject" value="{{ post.latestRevision.subject }}" />
+  <textarea name="body">{{ post.latestRevision.body }}</textarea>
   <input type="hidden" name="id" value="{{ post.id }}" />
   <input type="submit" />
 </form>

@@ -29,7 +29,11 @@ struct PostRevision {
     }
 
     init(forNewPost postId: UInt, subject: String, body: String, date: Date) throws {
-        id = 0
+        try self.init(forPost: postId, subject: subject, body: body, revisionId: 0, date: date)
+    }
+
+    init(forPost postId: UInt, subject: String, body: String, revisionId: UInt, date: Date = Date()) throws {
+        id = revisionId
         post = postId
         self.subject = subject
         self.body = body
@@ -46,6 +50,7 @@ struct PostRevision {
         if let qe = qe {
             throw qe
         }
+
     }
 
     init(fromDbRow dbRow: [String: Any?]) throws {
