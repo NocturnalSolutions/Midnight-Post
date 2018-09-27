@@ -64,11 +64,13 @@ public class MidnightPost {
             // Database file path
             "database-path": "~/Databases/midnight-post.sqlite",
             // Test database path. An empty string means use an in-memory DB.
-            "test-database-path": "~/Databases/midnight-post-test.sqlite",
+            "test-database-path": "",
             // Administration password. If empty, admins can't log in.
             "admin-password": "",
             // Session secret
             "session-secret": UUID.init().uuidString,
+            // Port to host on
+            "port": 8080,
             ])
 
         // Load CLI arguments first because an overriding config file path may have been

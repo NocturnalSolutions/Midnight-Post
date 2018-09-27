@@ -1,0 +1,32 @@
+; Configuration file for Midnight Post. Copy this file to a useful place, then
+; start Midnight Post with a `--config` parameter set to this file's path.
+
+; The path to the SQLite database file. You do not need to create the file
+; first, but the directory where you want it to be should be writable by the
+; user you run MP as.
+; database-path = /var/db/midnight-post.sqlite
+
+; The path to the SQLite database file used when testing the codebase. We use
+; a separate database for this so that the "production" database doesn't get
+; polluted with the content created by testing; the database will be deleted
+; when testing completes unless something goes seriously wrong. Leave this blank
+; or unset to simply use an in-RAM database.
+; test-database-path = 
+
+; Password used when logging in as the administrator user. Use the username
+; "Admin" combined with this password. If this setting is blank or unset,
+; logging in as the administrator will not work.
+; admin-password = swordfish
+
+; The unique string to use when encrypting cookie values. Set this to a unique
+; string for every MP site you operate. If you leave this unset, MP will pick
+; a random string for you when it starts up.
+; session-secret = Iliketurtles
+
+; The TCP/IP port that Midnight Post will serve on. 8080 by default.
+; port = 8080
+
+; The TCP/IP port that Midnight Post will serve on while running tests. 8080 by
+; default, but if you wish to run tests on the same machine serving a "real"
+; site, change this.
+; test-port = 8080
