@@ -7,6 +7,7 @@ import Foundation
 import Configuration_INIDeserializer
 import Configuration
 import KituraMarkdown
+import KituraSession
 
 public class MidnightPost {
 
@@ -45,6 +46,14 @@ public class MidnightPost {
         case databaseInstallationError
     }
 
+    // This needs to be Int because Session will serialize its value as JSON and
+    // JSONEncoder doesn't support enum values normally.
+    public enum UserLevel: Int {
+        case admin
+        case editor
+        case unauthorized
+    }
+
     public init() {
         config = ConfigurationManager()
         config.use(INIDeserializer())
@@ -56,6 +65,10 @@ public class MidnightPost {
             "database-path": "~/Databases/midnight-post.sqlite",
             // Test database path. An empty string means use an in-memory DB.
             "test-database-path": "~/Databases/midnight-post-test.sqlite",
+            // Administration password. If empty, admins can't log in.
+            "admin-password": "",
+            // Session secret
+            "session-secret": UUID.init().uuidString,
             ])
 
         // Load CLI arguments first because an overriding config file path may have been
@@ -153,8 +166,12 @@ public class MidnightPost {
     public func generateRouter() -> Router {
         let r = Router()
 
+        // Initialize middleware
         let postParser = PostParser()
         let postLoader = PostLoader()
+        let session = Session(secret: config["session-secret"] as! String)
+        let userVerifier = UserVerifier()
+        r.post(middleware: BodyParserMultiValue())
 
         // Add some custom filters to Stencil
         let ext = Extension()
@@ -172,8 +189,8 @@ public class MidnightPost {
         }
         r.setDefault(templateEngine: StencilTemplateEngine(extension: ext))
 
-        r.post(middleware: BodyParserMultiValue())
-
+        // MARK: Set up the database
+        r.get("/install", middleware: session, userVerifier)
         r.get("/install") { request, response, next in
             do {
                 try self.installDb()
@@ -185,13 +202,14 @@ public class MidnightPost {
         }
 
         // MARK: New post creation page
+        r.get("/admin/new", middleware: session, userVerifier)
         r.get("/admin/new") { request, response, next in
             try response.render("admin-edit-post", context: [:])
             next()
         }
 
         // MARK: New post submit handler
-        r.post("/admin/new", middleware: postParser)
+        r.post("/admin/new", middleware: session, userVerifier, postParser)
         r.post("/admin/new") { request, response, next in
             guard let postedPost = request.userInfo["postedPost"] as? [String: String] else {
                 try response.send(status: .unprocessableEntity).end()
@@ -222,6 +240,7 @@ public class MidnightPost {
         }
 
         // MARK: Show form to edit a post
+        r.get("/post/:post(\\d+)/edit", middleware: session, userVerifier)
         r.get("/post/:post(\\d+)/edit") { request, response, next in
             guard let post = request.userInfo["loadedPost"] as? Post else {
                 next()
@@ -232,7 +251,7 @@ public class MidnightPost {
         }
 
         // MARK: Take and save a post revision
-        r.post("/post/:post(\\d+)/edit", middleware: postLoader, postParser)
+        r.post("/post/:post(\\d+)/edit", middleware: session, userVerifier, postLoader, postParser)
         r.post("/post/:post(\\d+)/edit") { request, response, next in
             guard let post = request.userInfo["loadedPost"] as? Post,
                 let postedPost = request.userInfo["postedPost"] as? [String: String] else {
@@ -269,6 +288,77 @@ public class MidnightPost {
         // MARK: Front page
         r.get("/") { request, response, next in
             try self.getFrontPagePosts(response: response)
+            next()
+        }
+
+        // MARK: Log in form
+        r.get("/log-in", middleware: session)
+        r.get("/log-in") { request, response, next in
+            let context: [String: Any]
+            if request.session?["userLevel"] != nil {
+                context = ["alreadyLoggedIn": true]
+            }
+            else {
+                context = [:]
+            }
+            try response.render("log-in", context: context)
+            next()
+        }
+
+        // MARK: Log in form submission handler
+        r.post("/log-in", middleware: session)
+        r.post("/log-in") { request, response, next in
+            guard let postBody = request.body?.asMultiPart,
+                request.session?["userLevel"] == nil else {
+                try response.send(status: .unprocessableEntity).end()
+                next()
+                return
+            }
+            // Loop through parts and find username and password
+            var username: String?
+            var password: String?
+            for part in postBody {
+                if part.name == "username" {
+                    username = part.body.asText
+                }
+                else if part.name == "password" {
+                    password = part.body.asText
+                }
+            }
+
+            guard let user = username, let pass = password else {
+                try response.send(status: .unprocessableEntity).end()
+                next()
+                return
+            }
+
+            if user == "Admin" {
+                // Don't let the admin log in if there's no password set
+                if let adminPass = self.config["admin-password"] as? String, adminPass != "", pass == adminPass {
+                    request.session?["userLevel"] = UserLevel.admin.rawValue
+                    try response.redirect("/", status: .seeOther).end()
+                    next()
+                    return
+                }
+            }
+
+            // If here, the log in failed.
+            try response.render("log-in", context: ["loginFailed": true])
+            next()
+        }
+
+        // MARK: Log out, destroy session
+        r.get("/log-out", middleware: session)
+        r.get("/log-out") { request, response, next in
+            if request.session != nil {
+                request.session?.destroy { error in
+                    if let _ = error {
+                        // Maybe we should do something here, but I'm not really
+                        // sure what.
+                    }
+                }
+            }
+            try response.redirect("/").end()
             next()
         }
 

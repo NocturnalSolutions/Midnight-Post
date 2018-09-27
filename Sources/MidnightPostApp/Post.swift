@@ -146,7 +146,8 @@ public struct Post {
         MidnightPost.dbCxn?.execute(query: s) { queryResult in
             if let rows = queryResult.asRows {
                 posts = try? rows.map { row in
-                    try Post.init(fromDbRow: row)
+                    // This looks stupid, but it makes Xcode shut up.
+                    try Post.init(fromDbRow: row as Any as! [String : Any])
                 }
             }
         }

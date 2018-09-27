@@ -1,0 +1,21 @@
+{% extends "layout.stencil" %}
+
+{% block pageBody %}
+{% if loginFailed %}
+<div class="error">
+  Invalid credentials.
+</div>
+{% endif %}
+{% if alreadyLoggedIn %}
+<div class="error">
+  You're already logged in!
+</div>
+{% else %}
+<form method="post" action="/log-in" enctype="multipart/form-data">
+  <label>Username<input type="text" name="username" /></label>
+  <label>Password<input type="password" name="password" /></label>
+  <input type="submit"/>
+</form>
+{% endif %}
+{% endblock %}
+
