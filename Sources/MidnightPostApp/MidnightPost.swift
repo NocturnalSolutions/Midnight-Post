@@ -71,6 +71,10 @@ public class MidnightPost {
             "session-secret": UUID.init().uuidString,
             // Port to host on
             "port": 8080,
+            // Path to start a static file server for. For performance, use
+            // Nginx or another dedicated web server for static files, but for
+            // experimenting, we can set up one within Kitura for fun.
+            "static-path": ""
             ])
 
         // Load CLI arguments first because an overriding config file path may have been

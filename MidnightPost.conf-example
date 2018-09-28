@@ -30,3 +30,12 @@
 ; default, but if you wish to run tests on the same machine serving a "real"
 ; site, change this.
 ; test-port = 8080
+
+; The path of a directory of files to serve statically, under the "static" path;
+; eg, if the directory has a file of "foo.css", the path "static/foo.css" will
+; retrieve it. If unset or empty, a static file server will not be started. For
+; performance, on live site deployments, you should use Nginx or some other
+; dedicated web server to serve static files, but if you just want to quickly
+; experiment with Midnight Post, it may be easier to use this feature. Relative
+; pats will be relative to the Kitura project directory.
+; static-path = ./Views/static/

@@ -3,6 +3,7 @@
   <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <title>{% block pageTitle %}Midnight Post{% endblock %}</title>
+    <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <header>
