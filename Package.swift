@@ -9,8 +9,8 @@ let package = Package(
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
         .package(url: "https://github.com/IBM-Swift/Kitura.git", from: "2.4.0"),
-        .package(url: "https://github.com/NocturnalSolutions/Swift-Kuery.git", .branch("alterable-pk")),
-        .package(url: "https://github.com/NocturnalSolutions/Swift-Kuery-SQLite.git", .branch("alterable-pk")),
+        .package(url: "https://github.com/IBM-Swift/Swift-Kuery.git", .branch("next")),
+        .package(url: "https://github.com/NocturnalSolutions/Swift-Kuery-SQLite.git", .branch("next-returnid")),
         .package(url: "https://github.com/IBM-Swift/Kitura-StencilTemplateEngine.git", from: "1.9.1"),
         .package(url: "https://github.com/NocturnalSolutions/Configuration-INIDeserializer.git", .branch("master")),
         .package(url: "https://github.com/NocturnalSolutions/MidnightTest.git", .branch("master")),

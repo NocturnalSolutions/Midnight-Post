@@ -107,26 +107,17 @@ public class MidnightPost {
         let rt = PostRevisionTable()
 
         _ = rt.foreignKey(rt.postId, references: pt.id)
-        _ = rt.primaryKey(rt.postId, rt.id)
+        _ = pt.foreignKey(pt.revId, references: rt.id)
 
         var errorOccurred = false
         pt.create(connection: MidnightPost.dbCxn!) { result in
             guard result.success else {
                 errorOccurred = true
-//                throw MidnightPostError.tableCreationFailed
-//                let buildSql = try! pt.description(connection: MidnightPost.dbCxn!)
-//                try? response.send(status: .internalServerError)
-//                    .send("Cannot create post table: \(result.asError.debugDescription)\n\(buildSql)")
-//                    .end()
                 return
             }
             rt.create(connection: MidnightPost.dbCxn!) { result in
                 guard result.success else {
                     errorOccurred = true
-//                    let buildSql = try! rt.description(connection: MidnightPost.dbCxn!)
-//                    try? response.send(status: .internalServerError)
-//                        .send("Cannot create post revision table: \(result.asError.debugDescription)\n\(buildSql)")
-//                        .end()
                     return
                 }
             }
@@ -152,20 +143,21 @@ public class MidnightPost {
 
     func getFrontPagePosts(response: RouterResponse, page: UInt = 0) throws {
         guard let postCount = try? Post.getPostCount() else {
-            response.send(status: .internalServerError).send("Error occurred.")
+            try response.send(status: .internalServerError).end()
             return
         }
-        guard page <= postCount.pages else {
+        guard page < postCount.pages else {
             try response.send(status: .notFound).end()
             return
         }
-        let posts = Post.getNewPosts()
+        let posts = Post.getNewPosts(page: page)
         let formattedPosts = posts.map { $0.prepareForView() }
         try response.render("front", context: [
             "posts": formattedPosts,
             "postCount": postCount.posts,
             "pageCount": postCount.pages,
-            "curPage": page
+            "curPage": page,
+            "lastPage": postCount.pages - 1,
             ])
     }
 
@@ -196,15 +188,16 @@ public class MidnightPost {
         r.setDefault(templateEngine: StencilTemplateEngine(extension: ext))
 
         // MARK: Set up the database
-        r.get("/install", middleware: session, userVerifier)
+        r.get("/install", middleware: session/*, / *userVerifier*/)
         r.get("/install") { request, response, next in
             do {
                 try self.installDb()
                 response.send("Apparent success")
             }
             catch {
-                response.send(status: .internalServerError).send("Error occurred.")
+                try response.send(status: .internalServerError).end()
             }
+            next()
         }
 
         // MARK: New post creation page

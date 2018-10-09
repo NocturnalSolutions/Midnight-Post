@@ -7,12 +7,13 @@ class PostTable_v0: Table {
     let id = Column("post_id", Int32.self, autoIncrement: true, primaryKey: true)
 //    let date = Column("date", Varchar.self, length: 19, notNull: true, defaultValue: QueryBuilder.QuerySubstitutionNames.now)
     let date = Column("post_date", Varchar.self, length: 19, notNull: true)
+    let revId = Column("rev_id", Int32.self, notNull: true)
 }
 
 typealias PostTable = PostTable_v0
 
 public struct Post {
-    let id: UInt
+    let id: UInt32
     let date: Date
     let latestRevision: PostRevision
 
@@ -31,8 +32,8 @@ public struct Post {
         let pt = PostTable()
         date = Date()
         let now = MidnightPost.dateFormatter.string(from: date)
-        let i = Insert(into: pt, columns: [pt.date], values: [now], returnID: true)
-        var insertId: UInt?
+        let i = Insert(into: pt, columns: [pt.date, pt.revId], values: [now, 0], returnID: true)
+        var insertId: UInt32?
         var errorOnQuery: PostError?
         MidnightPost.dbCxn?.execute(query: i) { queryResult in
             if let id = queryResult.asRows?.first?["id"],
@@ -41,10 +42,10 @@ public struct Post {
                 // casts to an Int64 but not an Int32, and SQLite is vice versa.
                 // Not sure why.
                 if let id64 = insertedId as? Int64 {
-                    insertId = UInt(id64)
+                    insertId = UInt32(id64)
                 }
                 else if let id32 = insertedId as? Int32 {
-                    insertId = UInt(id32)
+                    insertId = UInt32(id32)
                 }
                 else {
                     errorOnQuery = PostError.FaultFetchingInsertId
@@ -60,7 +61,8 @@ public struct Post {
         id = insertId!
 
         do {
-            latestRevision = try PostRevision(forNewPost: id, subject: subject, body: body, date: date)
+            latestRevision = try PostRevision(forPost: id, subject: subject, body: body, date: date)
+            try setCurrentRevision(revId: latestRevision.id)
         }
         catch {
             throw PostError.FaultOnRevision(queryError: error)
@@ -73,10 +75,9 @@ public struct Post {
         var cols = rt.columns
         cols.append(pt.id)
         cols.append(pt.date)
-        let s = Select(fields: cols, from: [rt])
-            .where(rt.postId == Int(loadId))
-            .join(pt).on(pt.id == rt.postId)
-            .order(by: .DESC(rt.id))
+        let s = Select(fields: cols, from: [pt])
+            .where(pt.id == Int(loadId))
+            .naturalJoin(rt)
             .limit(to: 1)
         var possibleRow: [String: Any?]?
         MidnightPost.dbCxn?.execute(query: s) { queryResult in
@@ -101,19 +102,37 @@ public struct Post {
             let date = MidnightPost.dateFormatter.date(from: dateStr) else {
                 throw PostError.FaultCreatingFromRow
         }
-        self.id = UInt(id)
+        self.id = UInt32(id)
         self.date = date
         latestRevision = try PostRevision(fromDbRow: fromDbRow)
     }
 
     /// Add a new revision. Note we're not changing the actual latestRevision
     /// property.
-    func addNewRevision(subject: String, body: String) throws {
+    @discardableResult
+    func addNewRevision(subject: String, body: String) throws -> PostRevision {
         do {
-            _ = try PostRevision(forPost: id, subject: subject, body: body, revisionId: latestRevision.id + 1)
+            let rev = try PostRevision(forPost: id, subject: subject, body: body)
+            try setCurrentRevision(revId: rev.id)
+            return rev
         }
         catch {
             throw PostError.FaultOnRevision(queryError: error)
+        }
+    }
+
+    func setCurrentRevision(revId: UInt32) throws {
+        let pt = PostTable()
+        let u = Update(pt, set: [(pt.revId, revId)])
+            .where(pt.id == Int(id))
+        var error: Error? = nil
+        MidnightPost.dbCxn?.execute(query: u) { queryResult in
+            if let queryError = queryResult.asError {
+                error = queryError
+            }
+        }
+        if let error = error {
+            throw error
         }
     }
 
@@ -138,8 +157,8 @@ public struct Post {
         cols.append(pt.date)
 
         let s = Select(fields: cols, from: [pt])
-            .join(rt).on(pt.id == rt.postId)
-            .order(by: .DESC(pt.date))
+            .naturalJoin(rt)
+            .order(by: .DESC(pt.id))
             .limit(to: Post.postsPerPage)
             .offset(Post.postsPerPage * Int(page))
         var posts: [Post]? = nil
