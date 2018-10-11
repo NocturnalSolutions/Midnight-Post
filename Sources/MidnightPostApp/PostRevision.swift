@@ -29,7 +29,6 @@ struct PostRevision {
     }
 
     init(forPost postId: UInt32, subject: String, body: String, date: Date = Date()) throws {
-        #warning("Duplicates too much code from Revision.init")
         post = postId
         self.subject = subject
         self.body = body
@@ -37,28 +36,13 @@ struct PostRevision {
 
         let pr = PostRevisionTable()
         let i = Insert(into: pr, columns: [pr.postId, pr.subject, pr.body, pr.date], values: [post, subject, body, MidnightPost.dateFormatter.string(from: date)], returnID: true)
-        var qe: Error?
-        var insertId: UInt32?
-        MidnightPost.dbCxn?.execute(query: i) { queryResult in
-            if let error = queryResult.asError {
-                qe = error
-            }
-            else if let id = queryResult.asRows?.first?["id"], let insertedId = id {
-                if let id64 = insertedId as? Int64 {
-                    insertId = UInt32(id64)
-                }
-                else if let id32 = insertedId as? Int32 {
-                    insertId = UInt32(id32)
-                }
-                else {
-                    qe = PostRevisionError.FaultFetchingNewId
-                }
-            }
+
+        if let newId = try MidnightPost.dbCxn?.insertAndGetId(i) {
+            id = newId
         }
-        if let qe = qe {
-            throw qe
+        else {
+            throw PostRevisionError.FaultFetchingNewId
         }
-        id = insertId!
     }
 
     init(fromDbRow dbRow: [String: Any?]) throws {

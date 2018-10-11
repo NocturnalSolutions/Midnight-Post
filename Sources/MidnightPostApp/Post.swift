@@ -33,39 +33,24 @@ public struct Post {
         date = Date()
         let now = MidnightPost.dateFormatter.string(from: date)
         let i = Insert(into: pt, columns: [pt.date, pt.revId], values: [now, 0], returnID: true)
-        var insertId: UInt32?
-        var errorOnQuery: PostError?
-        MidnightPost.dbCxn?.execute(query: i) { queryResult in
-            if let id = queryResult.asRows?.first?["id"],
-                let insertedId = id {
-                // The value will be an Any, but for some reason, with MySQL, it
-                // casts to an Int64 but not an Int32, and SQLite is vice versa.
-                // Not sure why.
-                if let id64 = insertedId as? Int64 {
-                    insertId = UInt32(id64)
-                }
-                else if let id32 = insertedId as? Int32 {
-                    insertId = UInt32(id32)
-                }
-                else {
-                    errorOnQuery = PostError.FaultFetchingInsertId
-                }
-            }
-            else if let error = queryResult.asError {
-                errorOnQuery = PostError.FaultOnInitialInsert(queryError: error )
-            }
-        }
-        if let errorOnQuery = errorOnQuery {
-            throw errorOnQuery
-        }
-        id = insertId!
 
         do {
+            if let newId = try MidnightPost.dbCxn?.insertAndGetId(i) {
+                id = newId
+            }
+            else {
+                throw PostError.FaultFetchingInsertId
+            }
             latestRevision = try PostRevision(forPost: id, subject: subject, body: body, date: date)
             try setCurrentRevision(revId: latestRevision.id)
         }
         catch {
-            throw PostError.FaultOnRevision(queryError: error)
+            if error is QueryError {
+                throw PostError.FaultOnRevision(queryError: error)
+            }
+            else {
+                throw error
+            }
         }
     }
 
