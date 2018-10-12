@@ -33,8 +33,8 @@ public class MidnightPost {
         }
         else {
             let nsDbPath = NSString(string: dbPath)
-            // Redundant type label below is required to avoid a segfault on compilation for
-            // some effing reason.
+            // Redundant type label below is required to avoid a segfault on
+            // compilation for some effing reason.
             let expandedDbPath: String = String(nsDbPath.expandingTildeInPath)
             return .uri(expandedDbPath)
         }
@@ -68,7 +68,7 @@ public class MidnightPost {
             // Administration password. If empty, admins can't log in.
             "admin-password": "",
             // Session secret
-            "session-secret": UUID.init().uuidString,
+            "session-secret": UUID().uuidString,
             // Port to host on
             "port": 8080,
             // Path to start a static file server for. For performance, use
@@ -77,13 +77,13 @@ public class MidnightPost {
             "static-path": ""
             ])
 
-        // Load CLI arguments first because an overriding config file path may have been
-        // specified
+        // Load CLI arguments first because an overriding config file path may
+        // have been specified
         config.load(.commandLineArguments)
         if let configFileLoc = config["config"] as? String {
             config.load(file: configFileLoc)
-            // Load CLI arguments again because we want those to override settings in the
-            // config file
+            // Load CLI arguments again because we want those to override
+            // settings in the config file
             config.load(.commandLineArguments)
         }
     }
