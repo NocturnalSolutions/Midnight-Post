@@ -11,6 +11,7 @@ public class PostParser: RouterMiddleware {
         }
         var postedSubject: String?
         var postedBody: String?
+        var postedSlug: String?
         for part in postBody {
             if part.name == "body" {
                 postedBody = part.body.asText
@@ -18,15 +19,18 @@ public class PostParser: RouterMiddleware {
             else if part.name == "subject" {
                 postedSubject = part.body.asText
             }
+            else if part.name == "slug" {
+                postedSlug = part.body.asText
+            }
         }
 
-        guard let bodyValue = postedBody, let subjValue = postedSubject else {
+        guard let bodyValue = postedBody, let subjValue = postedSubject, let slugValue = postedSlug else {
             try response.send(status: .unprocessableEntity).end()
             next()
             return
         }
 
-        request.userInfo["postedPost"] = ["subject": subjValue, "body": bodyValue, /*"id" = postedId ?? ""*/]
+        request.userInfo["postedPost"] = ["subject": subjValue, "body": bodyValue, "slug": slugValue]
         next()
     }
 }

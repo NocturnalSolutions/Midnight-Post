@@ -4,6 +4,7 @@
 <form method="post" href="{% if post.id %}/post/{{ post.id }}/edit{% else %}/admin/new{% endif %}" enctype="multipart/form-data">
   <label>Subject<input type="text" name="subject" value="{{ post.latestRevision.subject }}" /></label>
   <label>Body<textarea name="body">{{ post.latestRevision.body }}</textarea></label>
+  <label>Slug<input type="text" name="slug" value="{{ post.latestRevision.slug }}" /></label>
   <input type="hidden" name="id" value="{{ post.id }}" />
   <input type="submit" />
 </form>

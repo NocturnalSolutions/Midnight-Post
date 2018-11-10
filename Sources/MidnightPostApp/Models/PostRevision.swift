@@ -8,6 +8,7 @@ class PostRevisionTable_v0: Table {
     let postId = Column("post_id", Int32.self, notNull: true)
     let subject = Column("subject", String.self, notNull: true)
     let body = Column("body", String.self, notNull: true)
+    let slug = Column("slug", Varchar.self, length: 255)
 
     func getIndexes() -> [Column] {
         return [id, postId]
@@ -22,20 +23,28 @@ struct PostRevision {
     let subject: String
     let body: String
     let date: Date
+    let slug: String?
 
     enum PostRevisionError: Error {
         case FaultCreatingFromRow
         case FaultFetchingNewId
     }
 
-    init(forPost postId: UInt32, subject: String, body: String, date: Date = Date()) throws {
+    init(forPost postId: UInt32, subject: String, body: String, date: Date = Date(), slug: String?) throws {
         post = postId
         self.subject = subject
         self.body = body
         self.date = date
+        self.slug = slug
 
         let pr = PostRevisionTable()
-        let i = Insert(into: pr, columns: [pr.postId, pr.subject, pr.body, pr.date], values: [post, subject, body, MidnightPost.dateFormatter.string(from: date)], returnID: true)
+        var columns = [pr.postId, pr.subject, pr.body, pr.date]
+        var values = [post, subject, body, MidnightPost.dateFormatter.string(from: date)] as [Any]
+        if let slug = slug {
+            columns.append(pr.slug)
+            values.append(slug)
+        }
+        let i = Insert(into: pr, columns: columns, values: values, returnID: true)
 
         if let newId = try MidnightPost.dbCxn?.insertAndGetId(i) {
             id = newId
@@ -62,5 +71,6 @@ struct PostRevision {
         self.subject = subject
         self.body = body
         self.date = date
+        self.slug = fixedRow[pr.slug.name] as? String
     }
 }

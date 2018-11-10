@@ -5,7 +5,6 @@ import KituraMarkdown
 class PostTable_v0: Table {
     let tableName = "posts"
     let id = Column("post_id", Int32.self, autoIncrement: true, primaryKey: true)
-//    let date = Column("date", Varchar.self, length: 19, notNull: true, defaultValue: QueryBuilder.QuerySubstitutionNames.now)
     let date = Column("post_date", Varchar.self, length: 19, notNull: true)
     let revId = Column("rev_id", Int32.self, notNull: true)
 }
@@ -26,14 +25,19 @@ public struct Post {
         case FaultCreatingFromRow
         case FaultFetchingInsertId
         case FaultGettingCount
+        case NoPostForSlug
+        case AlreadyPostForSlug
     }
 
-    init(subject: String, body: String) throws {
+    init(subject: String, body: String, slug: String?) throws {
         let pt = PostTable()
         date = Date()
         let now = MidnightPost.dateFormatter.string(from: date)
         let i = Insert(into: pt, columns: [pt.date, pt.revId], values: [now, 0], returnID: true)
 
+        if let slug = slug, Post.postExistsForSlug(slug) {
+            throw PostError.AlreadyPostForSlug
+        }
         do {
             if let newId = try MidnightPost.dbCxn?.insertAndGetId(i) {
                 id = newId
@@ -41,7 +45,7 @@ public struct Post {
             else {
                 throw PostError.FaultFetchingInsertId
             }
-            latestRevision = try PostRevision(forPost: id, subject: subject, body: body, date: date)
+            latestRevision = try PostRevision(forPost: id, subject: subject, body: body, date: date, slug: slug)
             try setCurrentRevision(revId: latestRevision.id)
         }
         catch {
@@ -92,12 +96,42 @@ public struct Post {
         latestRevision = try PostRevision(fromDbRow: fromDbRow)
     }
 
+    /// Load post by slug
+    init(slug: String) throws {
+        let pt = PostTable()
+        let rt = PostRevisionTable()
+        var cols = rt.columns
+        cols.append(pt.id)
+        cols.append(pt.date)
+        let s = Select(fields: cols, from: [rt])
+            .where(rt.slug == slug)
+            .naturalJoin(pt)
+            .limit(to: 1)
+        var possibleRow: [String: Any?]?
+        MidnightPost.dbCxn?.execute(query: s) { queryResult in
+            if let rows = queryResult.asRows, let row = rows.first {
+                possibleRow = row
+            }
+        }
+        if let row = possibleRow {
+            // I don't understand why all the values are double-wrapped
+            let goodRow = row.mapValues { value in value! }
+            try self.init(fromDbRow: goodRow)
+        }
+        else {
+            throw PostError.NoPostForSlug
+        }
+    }
+
     /// Add a new revision. Note we're not changing the actual latestRevision
     /// property.
     @discardableResult
-    func addNewRevision(subject: String, body: String) throws -> PostRevision {
+    func addNewRevision(subject: String, body: String, slug: String?) throws -> PostRevision {
+        if let slug = slug, Post.postExistsForSlug(slug, excludingPostId: id) {
+            throw PostError.AlreadyPostForSlug
+        }
         do {
-            let rev = try PostRevision(forPost: id, subject: subject, body: body)
+            let rev = try PostRevision(forPost: id, subject: subject, body: body, slug: slug)
             try setCurrentRevision(revId: rev.id)
             return rev
         }
@@ -180,4 +214,25 @@ public struct Post {
             throw PostError.FaultGettingCount
         }
     }
+
+    /// Check if a slug is already in use (without fetching an entire post)
+    static func postExistsForSlug(_ slug: String, excludingPostId: UInt32? = nil) -> Bool {
+        let pt = PostTable()
+        let rt = PostRevisionTable()
+        let s = Select(fields: [rt.slug], from: [rt])
+            .where(rt.slug == slug)
+            .naturalJoin(pt)
+            .limit(to: 1)
+        if let exclPostId = excludingPostId {
+            let intPostId = Int(exclPostId)
+            _ = s.where(rt.postId != intPostId)
+        }
+        var exists: Bool?
+        MidnightPost.dbCxn?.execute(query: s) { queryResult in
+            exists = queryResult.asRows?.count ?? 0 > 0
+        }
+
+        return exists ?? false
+    }
+
 }

@@ -216,7 +216,8 @@ public class MidnightPost {
                 return
             }
             do {
-                let post = try Post(subject: postedPost["subject"]!, body: postedPost["body"]!)
+                let slug: String? = postedPost["slug"]! == "" ? nil : postedPost["slug"]!
+                let post = try Post(subject: postedPost["subject"]!, body: postedPost["body"]!, slug: slug)
                 try response.redirect("/post/\(post.id)", status: .seeOther)
             }
             catch  {
@@ -258,7 +259,8 @@ public class MidnightPost {
                     return
             }
             do {
-                try post.addNewRevision(subject: postedPost["subject"]!, body: postedPost["body"]!)
+                let slug: String? = postedPost["slug"]! == "" ? nil : postedPost["slug"]!
+                try post.addNewRevision(subject: postedPost["subject"]!, body: postedPost["body"]!, slug: slug)
                 try response.redirect("/post/\(post.id)", status: .seeOther)
             }
             catch {
